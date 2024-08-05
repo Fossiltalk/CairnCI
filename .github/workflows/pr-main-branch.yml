@@ -1,5 +1,5 @@
 # Unique name for this workflow
-name: Validate PR on integration branch
+name: Validate PR on Main branch
 
 # Definition when the workflow should run
 on:
@@ -11,7 +11,7 @@ on:
       # The branches filter allows to specify that this workflow should only
       # run if the branch name is "develop". This way we prevent this workflow
       # from running when PRs are opened on other branches
-      branches: [ Integrate ]
+      branches: [ Main ]
       # We only care about changes to the force-app directory, which is the
       # root directory of the sfdx project. This prevents the job from running
       # when changing non-salesforce files (like this yml file).
@@ -138,7 +138,7 @@ jobs:
             - name: 'Populate auth file with SFDX_URL secret of integration org'
               shell: bash
               run: |
-                  echo ${{ secrets.SFDX_INTEGRATION_URL}} > ./SFDX_INTEGRATION_URL.txt
+                  echo ${{ secrets.SFDX_PRODUCTION_URL}} > ./SFDX_INTEGRATION_URL.txt
 
             # Authenticate to org using the URL stored in the text file
             - name: 'Authenticate to Integration Org'
