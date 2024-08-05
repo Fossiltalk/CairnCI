@@ -98,7 +98,8 @@ jobs:
             # Check if curl or wget
             - name: 'Check if wget installed'
               run: |
-                  which ls ; echo $?
+                  
+                  echo "USE_WGET=$(echo which wget)" >> $GITHUB_ENV
 
             # Now Install Salesforce CLI
             - name: 'Install Salesforce CLI'
