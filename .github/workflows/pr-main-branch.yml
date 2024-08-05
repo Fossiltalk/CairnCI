@@ -95,6 +95,11 @@ jobs:
               run: |
                   sf --version
             
+            # Check if curl or wget
+            - name: 'Check if wget installed'
+              run: |
+                  which ls ; echo $?
+
             # Now Install Salesforce CLI
             - name: 'Install Salesforce CLI'
               run: |
