@@ -98,8 +98,8 @@ jobs:
             # Check if curl or wget
             - name: 'Check if wget installed'
               run: |
-                  
                   echo "USE_WGET=$(echo which wget)" >> $GITHUB_ENV
+                  echo ${{ env.USE_WGET }}
 
             # Now Install Salesforce CLI
             - name: 'Install Salesforce CLI'
