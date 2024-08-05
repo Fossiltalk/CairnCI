@@ -89,7 +89,12 @@ jobs:
                   node ./parsePR.js              
                   TESTS=$(cat testsToRun.txt)       
                   echo "APEX_TESTS=$TESTS" >> $GITHUB_ENV
-                  
+            
+            # Check if CLI Installed
+            - name: 'Check if Salesforce CLI Installed'
+              run: |
+                  sf --version
+            
             # Now Install Salesforce CLI
             - name: 'Install Salesforce CLI'
               run: |
@@ -98,18 +103,20 @@ jobs:
                   tar xJf sfdx-linux-x64.tar.xz -C ~/sfdx --strip-components 1
                   echo "$HOME/sfdx/bin" >> $GITHUB_PATH
                   ~/sfdx/bin/sfdx version
-              continue-on-error: true
 
             # Then we install the SFDX-Git-Delta plugin - https://github.com/scolladon/sfdx-git-delta
             # This is an awesome plugin that allows us to extract a package.xml with the metadata
             # that has changed between commits. I highly recommend going over the github readme 
             # for more information on how this works.
 
+            - name: 'Checking for sfdx git delta'
+              run: |
+                  sf plugins --core
+
             - name: 'Installing sfdx git delta'
               run: | 
                   echo y | sfdx plugins:install sfdx-git-delta
                   sfdx plugins
-              continue-on-error: true
 
 #            # Install java as it is required for the next step
 #            - name: 'Installing java'
