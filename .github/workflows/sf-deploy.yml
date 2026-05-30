@@ -1,0 +1,311 @@
+# Reusable workflow: deploy to a Salesforce org on merge to a deployable branch.
+#
+# Consumers call this from a thin caller workflow triggered on push to the
+# branches that map to a deployable org (each mapped to a GitHub Environment
+# holding that org's SFDX_AUTH_URL secret).
+#
+# It prefers a quick deploy that reuses the validation produced for the merged
+# pull request (fast, no re-run of Apex tests). It only reuses a validation
+# whose validated commit is an ancestor of the commit being deployed, so the
+# exact same changes are deployed. Otherwise it falls back to a full deploy.
+#
+# See docs/consumer-setup.md and examples/caller-deploy.yml.
+name: Salesforce Deploy (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub Environment to deploy to (scopes the org secret + protection rules)."
+        required: false
+        type: string
+        default: ""
+      runs-on:
+        description: "Runner label(s) as a JSON array string. e.g. '[\"ubuntu-latest\"]'."
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
+      node-version:
+        required: false
+        type: string
+        default: "20"
+      sf-cli-version:
+        required: false
+        type: string
+        default: "latest"
+      sgd-version:
+        required: false
+        type: string
+        default: "latest"
+      source-dir:
+        required: false
+        type: string
+        default: "force-app"
+      test-level:
+        description: "Apex test level for the full-deploy fallback."
+        required: false
+        type: string
+        default: "RunLocalTests"
+      tests:
+        required: false
+        type: string
+        default: ""
+      wait:
+        required: false
+        type: string
+        default: "60"
+      rollback-strategy:
+        description: >-
+          What to do with git when the deploy to the org fails (the org itself
+          auto-rolls-back; this re-aligns git with the org). One of:
+          'none' (default), 'revert-pr' (open a PR that reverts the merge —
+          safe for protected branches), or 'revert-push' (push the revert
+          directly — requires the branch to allow pushes from GITHUB_TOKEN).
+        required: false
+        type: string
+        default: "none"
+    # No `secrets:` declaration on purpose. Environment-scoped secrets only
+    # resolve inside this reusable workflow's environment-bound job, so callers
+    # MUST use `secrets: inherit` (a declared/explicitly-passed secret would be
+    # evaluated in the caller's context, which has no environment, and come back
+    # empty). With inherit, `secrets.SFDX_AUTH_URL` below resolves from the
+    # GitHub Environment named by `inputs.environment`.
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    environment: ${{ inputs.environment }}
+    # Needed only when rollback-strategy is enabled (push a revert / open a PR).
+    # Permissions are still capped by the caller repo's workflow settings.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout (full history for delta + ancestry check)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Cache Salesforce toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm-global
+            ~/.local/share/sf
+            ~/.sf
+          key: sf-toolchain-${{ runner.os }}-node${{ inputs.node-version }}-cli${{ inputs.sf-cli-version }}-sgd${{ inputs.sgd-version }}
+
+      - name: Install Salesforce CLI + sfdx-git-delta
+        shell: bash
+        env:
+          SF_CLI_VERSION: ${{ inputs.sf-cli-version }}
+          SGD_VERSION: ${{ inputs.sgd-version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.npm-global"
+          npm config set prefix "$HOME/.npm-global"
+          echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.npm-global/bin:$PATH"
+
+          cliWanted="$(npm view "@salesforce/cli@${SF_CLI_VERSION}" version)"
+          cliInstalled="$(sf version 2>/dev/null | sed -n 's#.*@salesforce/cli/\([0-9][0-9.]*\).*#\1#p' | head -n1 || true)"
+          if [ "$cliInstalled" = "$cliWanted" ]; then
+            echo "sf CLI $cliInstalled already installed — skipping."
+          else
+            npm install --global "@salesforce/cli@${cliWanted}"
+          fi
+          sf version
+
+          sgdWanted="$(npm view "sfdx-git-delta@${SGD_VERSION}" version)"
+          sgdInstalled="$(sf plugins 2>/dev/null | sed -n 's/.*sfdx-git-delta \([0-9][0-9.]*\).*/\1/p' | head -n1 || true)"
+          if [ "$sgdInstalled" = "$sgdWanted" ]; then
+            echo "sfdx-git-delta $sgdInstalled already installed — skipping."
+          else
+            echo y | sf plugins install "sfdx-git-delta@${sgdWanted}"
+          fi
+          sf plugins
+
+      - name: Authenticate to target org
+        shell: bash
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SFDX_AUTH_URL:-}" ]; then
+            echo "::error::SFDX_AUTH_URL secret is empty." >&2
+            exit 1
+          fi
+          authfile="$(mktemp)"
+          trap 'rm -f "$authfile"' EXIT
+          printf '%s' "$SFDX_AUTH_URL" > "$authfile"
+          sf org login sfdx-url --sfdx-url-file "$authfile" --alias target-org --set-default
+
+      - name: Generate delta
+        id: delta
+        shell: bash
+        env:
+          SRC_DIR: ${{ inputs.source-dir }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # On a branch push, github.event.before is the previous tip. If it is the
+          # zero-sha (new branch / force scenarios) fall back to the first parent.
+          from="$BEFORE_SHA"
+          if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ]; then
+            from="$(git rev-parse HEAD^ 2>/dev/null || echo HEAD)"
+          fi
+          mkdir -p changed-sources
+          sf sgd source delta \
+            --from "$from" \
+            --to "HEAD" \
+            --source-dir "$SRC_DIR" \
+            --output-dir changed-sources \
+            --generate-delta
+          echo "----- delta package.xml -----"
+          cat changed-sources/package/package.xml 2>/dev/null || echo "(none)"
+          if grep -q "<types>" changed-sources/package/package.xml 2>/dev/null; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            echo "No deployable metadata changed — nothing to deploy."
+          fi
+
+      - name: Find a reusable validation job-id
+        id: lookup
+        if: steps.delta.outputs.has-changes == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jobId=""
+          if command -v gh >/dev/null 2>&1; then
+            # Newest-first list of non-expired validation artifacts.
+            ids="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
+              --jq '[.artifacts[] | select(.name|startswith("sf-validation-")) | select(.expired==false)] | sort_by(.created_at) | reverse | .[].id' 2>/dev/null || true)"
+            for id in $ids; do
+              if gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" > art.zip 2>/dev/null && unzip -o art.zip >/dev/null 2>&1; then
+                sha="$(node -e 'try{process.stdout.write((require("./validation.json").sha)||"")}catch(e){}' 2>/dev/null || true)"
+                jid="$(node -e 'try{process.stdout.write((require("./validation.json").jobId)||"")}catch(e){}' 2>/dev/null || true)"
+                rm -f validation.json art.zip
+                # Only reuse when the validated commit is an ancestor of HEAD, so the
+                # exact validated changes are what we deploy (true for merge commits,
+                # false for squash/rebase -> safe full-deploy fallback).
+                if [ -n "$sha" ] && [ -n "$jid" ] && git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then
+                  jobId="$jid"
+                  echo "Reusing validation $jobId (validated commit $sha is an ancestor of HEAD)."
+                  break
+                fi
+              fi
+            done
+          else
+            echo "::notice::gh CLI not available on this runner — will run a full deploy."
+          fi
+          echo "job-id=$jobId" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy (quick deploy, fallback to full)
+        id: deploy
+        if: steps.delta.outputs.has-changes == 'true'
+        shell: bash
+        env:
+          JOB_ID: ${{ steps.lookup.outputs.job-id }}
+          SRC_DIR: ${{ inputs.source-dir }}
+          TEST_LEVEL: ${{ inputs.test-level }}
+          TESTS: ${{ inputs.tests }}
+          WAIT: ${{ inputs.wait }}
+        run: |
+          set -euo pipefail
+          if [ -n "${JOB_ID// /}" ]; then
+            echo "Attempting quick deploy of job-id $JOB_ID"
+            if sf project deploy quick --job-id "$JOB_ID" --wait "$WAIT"; then
+              echo "Quick deploy succeeded."
+              exit 0
+            fi
+            echo "::warning::Quick deploy failed (expired or different org). Falling back to full deploy."
+          else
+            echo "No reusable validation — running a full deploy."
+          fi
+
+          args=(project deploy start --source-dir "changed-sources/${SRC_DIR}" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
+            for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
+          fi
+          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
+            args+=(--post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml)
+          fi
+          echo "Running: sf ${args[*]}"
+          sf "${args[@]}"
+
+      # Re-align git with the org when the deploy failed. The org auto-rolls-back
+      # a failed deploy, so the merged commits no longer match what's deployed.
+      # Runs ONLY for a genuine deploy failure (not setup/auth failures).
+      - name: Roll back merge on deploy failure
+        if: ${{ failure() && steps.deploy.outcome == 'failure' && inputs.rollback-strategy != 'none' }}
+        shell: bash
+        env:
+          STRATEGY: ${{ inputs.rollback-strategy }}
+          BRANCH: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Build the revert commit(s) on whatever branch is currently checked out.
+          do_revert() {
+            # 3+ words from `--parents` => HEAD has 2+ parents => it's a merge commit.
+            local nwords
+            nwords="$(git rev-list --parents -n 1 HEAD | wc -w)"
+            if [ "$nwords" -ge 3 ]; then
+              echo "HEAD is a merge commit — reverting the merge (mainline = first parent)."
+              git revert --no-edit -m 1 HEAD
+            else
+              local from="$BEFORE_SHA"
+              if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ]; then
+                from="HEAD^"
+              fi
+              echo "HEAD is linear — reverting range ${from}..HEAD (covers squash/rebase merges)."
+              git revert --no-edit "${from}..HEAD"
+            fi
+          }
+
+          case "$STRATEGY" in
+            revert-push)
+              do_revert
+              if git push origin "HEAD:${BRANCH}"; then
+                echo "::warning::Deploy failed — pushed a revert to '${BRANCH}' to match the org."
+              else
+                echo "::error::Could not push the revert to '${BRANCH}'. The branch likely blocks direct pushes; use rollback-strategy: revert-pr." >&2
+                exit 1
+              fi
+              ;;
+            revert-pr)
+              if ! command -v gh >/dev/null 2>&1; then
+                echo "::error::rollback-strategy 'revert-pr' needs the gh CLI, which is not available on this runner." >&2
+                exit 1
+              fi
+              rb="rollback/${HEAD_SHA}"
+              git checkout -b "$rb"
+              do_revert
+              git push --force origin "$rb"
+              gh pr create \
+                --base "$BRANCH" \
+                --head "$rb" \
+                --title "Rollback: deploy to ${ENVIRONMENT:-org} failed (${HEAD_SHA})" \
+                --body "The deploy to **${ENVIRONMENT:-the org}** failed, so the org was rolled back automatically but this branch was not. This PR reverts the merged change(s) to re-align \`${BRANCH}\` with the org. Review the failed deploy logs before merging." \
+                || echo "::warning::Revert branch pushed, but opening the PR failed (it may already exist)."
+              echo "::warning::Deploy failed — opened a revert PR for '${BRANCH}'."
+              ;;
+            *)
+              echo "Unknown rollback-strategy '${STRATEGY}' — skipping rollback."
+              ;;
+          esac

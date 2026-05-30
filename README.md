@@ -1,4 +1,34 @@
-# Salesforce DX Project: Next Steps
+# salesforceci — a modern, extensible Salesforce CI pipeline
+
+Distributable GitHub Actions for Salesforce DX repos. Consumers add a short
+caller workflow that calls these versioned **reusable workflows**; all behavior is
+controlled through inputs and secrets — no pipeline logic is copied into the
+consumer repo.
+
+- **Validate on PR** — delta-only, check-only `sf project deploy validate` with `RunLocalTests`.
+- **Deploy on merge** — branch→environment mapping; reuses the PR's validation for a
+  **quick deploy**, with an automatic full-deploy fallback.
+- **Built on the modern `sf` CLI + sfdx-git-delta**, with pinnable Node/CLI/plugin versions.
+- **Runs on GitHub-hosted or self-hosted** runners.
+- **Optional field governance gate** — blocks new fields lacking permission-set access or
+  required governance metadata.
+
+**Start here:** [docs/consumer-setup.md](docs/consumer-setup.md) ·
+[field governance](docs/field-governance.md) · example callers in [`examples/`](examples).
+
+Workflows: [`sf-validate.yml`](.github/workflows/sf-validate.yml),
+[`sf-deploy.yml`](.github/workflows/sf-deploy.yml). Gate action:
+[`.github/actions/field-permset-gate`](.github/actions/field-permset-gate).
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE) — permissive, with an explicit
+patent grant. You may use it in commercial and internal/government DevOps
+pipelines. See [`NOTICE`](NOTICE) for attribution.
+
+---
+
+## Salesforce DX Project: Next Steps
 
 Now that you’ve created a Salesforce DX project, what’s next? Here are some documentation resources to get you started.
 

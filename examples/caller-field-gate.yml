@@ -1,0 +1,37 @@
+# Optional: drop this in your repo at .github/workflows/sf-field-gate.yml
+# It blocks PRs that add custom fields without proper permission-set access
+# and (optionally) without required governance metadata.
+name: Salesforce Field Governance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "force-app/**/fields/**"
+      - "force-app/**/permissionsets/**"
+
+jobs:
+  field-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: Fossiltalk/salesforceci/.github/actions/field-permset-gate@v1
+        with:
+          source-dir: force-app
+          require-permission-set: "true"
+          # Require specific access in specific permission sets:
+          # required-permission-sets: '[{"permissionSet":"Sales_PS","access":"edit","objects":["Opportunity"]}]'
+          # Require governance metadata on new fields:
+          # require-description: "true"
+          # require-help-text: "true"
+          # require-data-owner: "true"
+          # require-field-usage: "true"
+          # require-data-sensitivity: "true"
+          # require-compliance: "true"
+          # Or keep all of the above in a committed policy file:
+          # policy-file: ".salesforceci/field-policy.json"

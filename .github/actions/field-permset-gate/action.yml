@@ -1,0 +1,74 @@
+name: "Field permission-set governance gate"
+description: >-
+  Fail the build when newly added custom fields are not granted in at least one
+  permission set, or do not meet configured governance requirements (specific
+  permission-set access, Data Owner, help text, description, Field Usage, Data
+  Sensitivity Level, Compliance Categorization).
+
+inputs:
+  source-dir:
+    description: "SFDX source directory to scan."
+    required: false
+    default: "force-app"
+  base-ref:
+    description: "Git ref to diff against to find newly added fields."
+    required: false
+    default: "origin/${{ github.base_ref }}"
+  require-permission-set:
+    description: "Block new fields not granted in >= 1 permission set."
+    required: false
+    default: "true"
+  required-permission-sets:
+    description: >-
+      JSON array of rules requiring specific access in specific permission sets, e.g.
+      '[{"permissionSet":"Sales_PS","access":"edit","objects":["Opportunity"]}]'.
+      access is 'read' or 'edit'. Omit "objects" to apply to all new fields.
+    required: false
+    default: ""
+  require-description:
+    description: "Require <description> on new fields."
+    required: false
+    default: "false"
+  require-help-text:
+    description: "Require <inlineHelpText> on new fields."
+    required: false
+    default: "false"
+  require-data-owner:
+    description: "Require Data Owner (<businessOwner>/<businessOwnerGroup>) on new fields."
+    required: false
+    default: "false"
+  require-field-usage:
+    description: "Require Field Usage (<businessStatus>) on new fields."
+    required: false
+    default: "false"
+  require-data-sensitivity:
+    description: "Require Data Sensitivity Level (<securityClassification>) on new fields."
+    required: false
+    default: "false"
+  require-compliance:
+    description: "Require Compliance Categorization (<complianceGroup>) on new fields."
+    required: false
+    default: "false"
+  policy-file:
+    description: "Optional JSON policy file whose keys override the inputs above."
+    required: false
+    default: ".salesforceci/field-policy.json"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Run field governance gate"
+      shell: bash
+      env:
+        INPUT_SOURCE_DIR: ${{ inputs.source-dir }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_REQUIRE_PERMISSION_SET: ${{ inputs.require-permission-set }}
+        INPUT_REQUIRED_PERMISSION_SETS: ${{ inputs.required-permission-sets }}
+        INPUT_REQUIRE_DESCRIPTION: ${{ inputs.require-description }}
+        INPUT_REQUIRE_HELP_TEXT: ${{ inputs.require-help-text }}
+        INPUT_REQUIRE_DATA_OWNER: ${{ inputs.require-data-owner }}
+        INPUT_REQUIRE_FIELD_USAGE: ${{ inputs.require-field-usage }}
+        INPUT_REQUIRE_DATA_SENSITIVITY: ${{ inputs.require-data-sensitivity }}
+        INPUT_REQUIRE_COMPLIANCE: ${{ inputs.require-compliance }}
+        INPUT_POLICY_FILE: ${{ inputs.policy-file }}
+      run: node "${{ github.action_path }}/index.mjs"

@@ -1,0 +1,9 @@
+salesforceci
+Copyright 2026 Fossiltalk
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This software invokes, but does not redistribute, third-party tools at runtime,
+each under its own license, including:
+  - Salesforce CLI (@salesforce/cli)
+  - sfdx-git-delta (https://github.com/scolladon/sfdx-git-delta)
