@@ -104,6 +104,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Pre-flight checks
+        shell: bash
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          if [ -z "${SFDX_AUTH_URL:-}" ]; then
+            echo "::error::SFDX_AUTH_URL secret is empty or not set." >&2
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -219,10 +229,6 @@ jobs:
           SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
         run: |
           set -euo pipefail
-          if [ -z "${SFDX_AUTH_URL:-}" ]; then
-            echo "::error::SFDX_AUTH_URL secret is empty." >&2
-            exit 1
-          fi
           authfile="$(mktemp)"
           trap 'rm -f "$authfile"' EXIT
           printf '%s' "$SFDX_AUTH_URL" > "$authfile"
@@ -322,12 +328,15 @@ jobs:
             echo "No reusable validation — running a full deploy."
           fi
 
-          args=(project deploy start --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
+            args=(project deploy start --manifest changed-sources/package/package.xml \
+              --post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml \
+              --test-level "$TEST_LEVEL" --wait "$WAIT")
+          else
+            args=(project deploy start --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          fi
           if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
             for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
-          fi
-          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
-            args+=(--post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml)
           fi
           echo "Running: sf ${args[*]}"
           sf "${args[@]}"
