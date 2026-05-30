@@ -11,6 +11,11 @@ name: Salesforce Validate (reusable)
 on:
   workflow_call:
     inputs:
+      environment:
+        description: "GitHub Environment to validate against (scopes the org secret + protection rules). Defaults to no environment (repo-level secret)."
+        required: false
+        type: string
+        default: ""
       runs-on:
         description: "Runner label(s) as a JSON array string. e.g. '[\"ubuntu-latest\"]' or '[\"self-hosted\",\"linux\"]'."
         required: false
@@ -71,6 +76,7 @@ jobs:
   validate:
     name: Validate delta
     runs-on: ${{ fromJSON(inputs.runs-on) }}
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout (full history for delta)
         uses: actions/checkout@v5
