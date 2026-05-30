@@ -1,26 +1,26 @@
 public with sharing class ExampleApexClass {
 
-    public static List<Integer> sieve(Integer limit) {
-        if (limit < 2) {
+    public static List<Integer> sieve(Integer n) {
+        if (n < 2) {
             return new List<Integer>();
         }
 
-        Boolean[] isComposite = new Boolean[limit + 1];
-        for (Integer i = 0; i <= limit; i++) {
-            isComposite[i] = false;
+        List<Boolean> isComposite = new List<Boolean>();
+        for (Integer i = 0; i <= n; i++) {
+            isComposite.add(false);
         }
 
-        Integer sqrtLimit = (Integer) Math.floor(Math.sqrt(limit));
-        for (Integer i = 2; i <= sqrtLimit; i++) {
+        Integer sqrtN = (Integer) Math.floor(Math.sqrt((Double) n));
+        for (Integer i = 2; i <= sqrtN; i++) {
             if (!isComposite[i]) {
-                for (Integer j = i * i; j <= limit; j += i) {
+                for (Integer j = i * i; j <= n; j += i) {
                     isComposite[j] = true;
                 }
             }
         }
 
         List<Integer> primes = new List<Integer>();
-        for (Integer i = 2; i <= limit; i++) {
+        for (Integer i = 2; i <= n; i++) {
             if (!isComposite[i]) {
                 primes.add(i);
             }
