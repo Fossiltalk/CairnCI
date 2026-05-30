@@ -68,6 +68,11 @@ on:
         required: false
         type: string
         default: ""
+      min-coverage:
+        description: "Minimum org-wide Apex test coverage percentage required to pass. Default: 75."
+        required: false
+        type: string
+        default: ""
     # Callers must use `secrets: inherit` so `secrets.SFDX_AUTH_URL` resolves
     # (repo-level for PR validation, or environment-scoped if the caller job is
     # environment-bound). See sf-deploy.yml for why we don't declare it explicitly.
@@ -107,6 +112,7 @@ jobs:
           IN_TEST_LEVEL: ${{ inputs.test-level }}
           IN_TESTS: ${{ inputs.tests }}
           IN_WAIT: ${{ inputs.wait }}
+          IN_MIN_COVERAGE: ${{ inputs.min-coverage }}
           IN_ROLLBACK_STRATEGY: ""
         run: |
           node <<'EOF'
@@ -119,13 +125,14 @@ jobs:
           } else {
             console.log("No config file at '" + cfgPath + "' — using inputs/defaults.");
           }
-          const defaults = { sourceDir: "force-app", delta: "true", testLevel: "RunLocalTests", tests: "", wait: "60", rollbackStrategy: "none" };
+          const defaults = { sourceDir: "force-app", delta: "true", testLevel: "RunLocalTests", tests: "", wait: "60", minCoverage: "75", rollbackStrategy: "none" };
           const inputs = {
             sourceDir: process.env.IN_SOURCE_DIR,
             delta: process.env.IN_DELTA,
             testLevel: process.env.IN_TEST_LEVEL,
             tests: process.env.IN_TESTS,
             wait: process.env.IN_WAIT,
+            minCoverage: process.env.IN_MIN_COVERAGE,
             rollbackStrategy: process.env.IN_ROLLBACK_STRATEGY,
           };
           const pick = (k) => {
@@ -140,6 +147,7 @@ jobs:
             EFFECTIVE_TEST_LEVEL: "testLevel",
             EFFECTIVE_TESTS: "tests",
             EFFECTIVE_WAIT: "wait",
+            EFFECTIVE_MIN_COVERAGE: "minCoverage",
             EFFECTIVE_ROLLBACK_STRATEGY: "rollbackStrategy",
           };
           let out = "";
@@ -278,10 +286,27 @@ jobs:
           set -e
           echo "$out"
           jobId="$(printf '%s' "$out" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const j=JSON.parse(d);process.stdout.write((j.result&&j.result.id)||"")}catch(e){}})')"
+          coveragePct="$(printf '%s' "$out" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const j=JSON.parse(d);const cov=(j.result&&j.result.details&&j.result.details.runTestResult&&j.result.details.runTestResult.codeCoverage)||[];const total=cov.reduce((s,c)=>s+(c.numLocations||0),0);const covered=cov.reduce((s,c)=>s+((c.numLocations||0)-(c.numLocationsNotCovered||0)),0);process.stdout.write(total>0?String(Math.floor(covered/total*100)):"100")}catch(e){process.stdout.write("100")}})')"
           printf '{"jobId":"%s","sha":"%s"}\n' "$jobId" "${HEAD_SHA:-}" > validation.json
           echo "job-id=$jobId" >> "$GITHUB_OUTPUT"
+          echo "coverage=$coveragePct" >> "$GITHUB_OUTPUT"
           [ "$code" -eq 0 ] || { echo "::error::Validation failed." >&2; exit "$code"; }
-          echo "Validation OK. job-id=$jobId"
+          echo "Validation OK. job-id=$jobId  coverage=${coveragePct}%"
+
+      - name: Check test coverage
+        if: steps.validate.outputs.job-id != ''
+        shell: bash
+        env:
+          COVERAGE: ${{ steps.validate.outputs.coverage }}
+          MIN_COVERAGE: ${{ env.EFFECTIVE_MIN_COVERAGE }}
+        run: |
+          set -euo pipefail
+          echo "Measured coverage: ${COVERAGE}%  (required >= ${MIN_COVERAGE}%)"
+          if [ "${COVERAGE}" -lt "${MIN_COVERAGE}" ]; then
+            echo "::error::Test coverage ${COVERAGE}% is below the required minimum of ${MIN_COVERAGE}%." >&2
+            exit 1
+          fi
+          echo "Coverage OK."
 
       - name: Upload validation job-id
         if: steps.validate.outputs.job-id != ''
