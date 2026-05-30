@@ -62,7 +62,7 @@ inputs:
   policy-file:
     description: "Optional JSON policy file. Explicit (non-empty) inputs above override its keys; its keys override built-in defaults."
     required: false
-    default: ".codeyci/field-policy.json"
+    default: ".cairnci/field-policy.json"
 
 runs:
   using: "composite"

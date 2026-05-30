@@ -1,20 +1,20 @@
 # Consumer setup
 
-> **Not affiliated with Salesforce.** CodeyCI is an independent,
+> **Not affiliated with Salesforce.** CairnCI is an independent,
 > community-maintained project, not affiliated with or endorsed by Salesforce, Inc.
-> "Salesforce", "SFDX", and "Codey" (the Salesforce mascot) are trademarks of
-> Salesforce, Inc., referenced here nominatively only. See [`NOTICE`](../NOTICE).
+> "Salesforce" and "SFDX" are trademarks of Salesforce, Inc., referenced here
+> nominatively only. See [`NOTICE`](../NOTICE).
 
-CodeyCI is a set of **reusable GitHub Actions workflows** plus an optional
+CairnCI is a set of **reusable GitHub Actions workflows** plus an optional
 governance action. There are two supported ways to adopt it — pick one:
 
 | | **Path A — Reference (recommended)** | **Path B — Vendor (clone in)** |
 |---|---|---|
-| How | Slim caller workflows call a pinned version of CodeyCI (`@v1`); a local config file controls features/behavior. | Copy a pinned version of CodeyCI's workflows + actions into your own repo and call them locally. |
-| You maintain | A few short caller files + `.codeyci/*.json`. | The caller files **and** the copied pipeline code. |
+| How | Slim caller workflows call a pinned version of CairnCI (`@v1`); a local config file controls features/behavior. | Copy a pinned version of CairnCI's workflows + actions into your own repo and call them locally. |
+| You maintain | A few short caller files + `.cairnci/*.json`. | The caller files **and** the copied pipeline code. |
 | Updates | Bump the `@vX` tag. | Re-copy a newer tagged version. |
 | Best for | Most teams; least to maintain. | Air-gapped / strict-security orgs that must keep **all** executed CI code in-repo, reviewed and pinned (common for government). |
-| External dependency on CodeyCI at runtime | Yes (resolved from GitHub at run time). | No — everything runs from your repo. |
+| External dependency on CairnCI at runtime | Yes (resolved from GitHub at run time). | No — everything runs from your repo. |
 
 Sections 1–3 apply to **both** paths. Then do **either** §4A or §4B.
 
@@ -52,7 +52,7 @@ pointing at a sandbox is enough.
 
 ## 4A. Path A — Reference a pinned version (recommended)
 
-You add small caller workflows; the heavy lifting stays in CodeyCI at the
+You add small caller workflows; the heavy lifting stays in CairnCI at the
 version you pin. **Which features run** is decided by which callers you add;
 **how they behave** is controlled by inputs and/or a committed config file (§6).
 
@@ -61,13 +61,13 @@ version you pin. **Which features run** is decided by which callers you add;
    - [`examples/caller-deploy.yml`](../examples/caller-deploy.yml) — deploy on merge.
    - [`examples/caller-field-gate.yml`](../examples/caller-field-gate.yml) — optional governance gate.
 2. **Pin the version.** Each caller references a released tag, e.g.
-   `uses: Fossiltalk/CodeyCI/.github/workflows/sf-validate.yml@v1`. Use a
+   `uses: Fossiltalk/CairnCI/.github/workflows/sf-validate.yml@v1`. Use a
    major tag (`@v1`) for automatic minor updates, or pin to an exact tag/commit
    SHA for maximum reproducibility (recommended for production/government).
 3. (Optional) Add [`examples/config.json`](../examples/config.json) at
-   `.codeyci/config.json` and/or
+   `.cairnci/config.json` and/or
    [`examples/field-policy.json`](../examples/field-policy.json) at
-   `.codeyci/field-policy.json` to control behavior in-repo (§6).
+   `.cairnci/field-policy.json` to control behavior in-repo (§6).
 
 A minimal validate caller:
 
@@ -78,7 +78,7 @@ on:
     paths: ["force-app/**"]
 jobs:
   validate:
-    uses: Fossiltalk/CodeyCI/.github/workflows/sf-validate.yml@v1
+    uses: Fossiltalk/CairnCI/.github/workflows/sf-validate.yml@v1
     secrets: inherit
 ```
 
@@ -98,29 +98,29 @@ an `if:` or a repo variable.
 Use this when policy requires every line of executed CI to live in your own repo,
 reviewed and pinned (no external action references at run time).
 
-1. **Copy a specific tagged version** of CodeyCI's pipeline into your repo,
+1. **Copy a specific tagged version** of CairnCI's pipeline into your repo,
    preserving paths:
    - `.github/workflows/sf-validate.yml`
    - `.github/workflows/sf-deploy.yml`
    - `.github/actions/**` (includes the field gate)
 
-   For example, from a checkout of `CodeyCI` at tag `v1.2.0`:
+   For example, from a checkout of `CairnCI` at tag `v1.2.0`:
 
    ```bash
-   # run from the root of YOUR repo; SRC points at a CodeyCI checkout @ the tag
-   SRC=/path/to/CodeyCI
+   # run from the root of YOUR repo; SRC points at a CairnCI checkout @ the tag
+   SRC=/path/to/CairnCI
    mkdir -p .github/workflows .github/actions
    cp "$SRC/.github/workflows/sf-validate.yml" .github/workflows/
    cp "$SRC/.github/workflows/sf-deploy.yml"   .github/workflows/
    cp -r "$SRC/.github/actions/." .github/actions/
-   echo "vendored from Fossiltalk/CodeyCI@v1.2.0" > .github/actions/CODEYCI_VERSION
+   echo "vendored from Fossiltalk/CairnCI@v1.2.0" > .github/actions/CAIRNCI_VERSION
    ```
 
-   Record the version you copied (the `CODEYCI_VERSION` marker above) so
+   Record the version you copied (the `CAIRNCI_VERSION` marker above) so
    audits and future updates know exactly what's running.
 
 2. **Add caller workflows that reference the copies locally** (note `./` instead
-   of `Fossiltalk/CodeyCI/...@v1`). The repo's own dogfood callers are ready
+   of `Fossiltalk/CairnCI/...@v1`). The repo's own dogfood callers are ready
    templates — copy them:
    - [`.github/workflows/ci-validate.yml`](../.github/workflows/ci-validate.yml)
    - [`.github/workflows/ci-deploy.yml`](../.github/workflows/ci-deploy.yml)
@@ -140,10 +140,10 @@ reviewed and pinned (no external action references at run time).
    The field gate is referenced locally too:
    `uses: ./.github/actions/field-permset-gate`.
 
-3. (Optional) Add `.codeyci/config.json` / `.codeyci/field-policy.json`
+3. (Optional) Add `.cairnci/config.json` / `.cairnci/field-policy.json`
    exactly as in Path A (§6) — the resolution logic is identical.
 
-4. **Updating:** re-copy the workflows/actions from a newer CodeyCI tag and
+4. **Updating:** re-copy the workflows/actions from a newer CairnCI tag and
    review the diff in a PR. Because there are no external `@vX` references, your
    pinned version is simply "whatever you last copied."
 
@@ -209,7 +209,7 @@ both adoption paths):
 - **Workflow inputs** — the `with:` block in your caller workflow. Best for a
   setting that differs per caller or that you want visible right next to the
   trigger.
-- **A committed config file** — `.codeyci/config.json` in your repo. Best
+- **A committed config file** — `.cairnci/config.json` in your repo. Best
   for project-wide settings you want version-controlled and reviewed in PRs
   (ideal for audit/change-control). See [`examples/config.json`](../examples/config.json).
 
@@ -224,7 +224,7 @@ evaluated before any step runs, so they **must** stay in the caller workflow
 `sourceDir`, `testLevel`, `tests`, `wait`, `rollbackStrategy`.
 
 The field gate follows the same precedence with its own
-`.codeyci/field-policy.json` (see [field governance](field-governance.md)).
+`.cairnci/field-policy.json` (see [field governance](field-governance.md)).
 
 ## 7. Inputs (all optional)
 
@@ -241,7 +241,7 @@ The field gate follows the same precedence with its own
 | `wait`           | `60`             | Minutes to wait for the org job. |
 | `environment`    | `""` (deploy only) | GitHub Environment to deploy to. |
 | `rollback-strategy` | `none` (deploy only) | `none` / `revert-pr` / `revert-push`. See §5a. |
-| `config-file`    | `.codeyci/config.json` | Path to the optional JSON config file. |
+| `config-file`    | `.cairnci/config.json` | Path to the optional JSON config file. |
 
 ## 8. Runners
 

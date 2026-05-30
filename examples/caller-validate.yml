@@ -10,7 +10,7 @@ on:
 
 jobs:
   validate:
-    uses: Fossiltalk/CodeyCI/.github/workflows/sf-validate.yml@v1
+    uses: Fossiltalk/CairnCI/.github/workflows/sf-validate.yml@v1
     with:
       # All inputs are optional; defaults shown for reference.
       source-dir: force-app
