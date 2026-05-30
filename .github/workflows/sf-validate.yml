@@ -12,7 +12,7 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: "GitHub Environment to validate against (scopes the org secret + protection rules). Defaults to no environment (repo-level secret)."
+        description: "GitHub Environment to validate against (scopes the org secret). Recommended convention: '<branch>-validate' (e.g. 'main-validate') — a separate environment with no deployment branch restrictions, so PR refs can deploy to it. Defaults to no environment (repo-level secret)."
         required: false
         type: string
         default: ""

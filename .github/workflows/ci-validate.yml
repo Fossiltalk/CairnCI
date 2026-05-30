@@ -14,7 +14,7 @@ jobs:
   validate:
     uses: ./.github/workflows/sf-validate.yml
     with:
-      environment: ${{ github.base_ref }}
+      environment: ${{ github.base_ref }}-validate
       source-dir: force-app
       test-level: RunLocalTests
     secrets: inherit
