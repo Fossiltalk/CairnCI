@@ -14,13 +14,13 @@ jobs:
   field-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "lts/*"
-      - uses: Fossiltalk/CodeyCI/.github/actions/field-permset-gate@v1
+      - uses: Fossiltalk/CairnCI/.github/actions/field-permset-gate@v1
         with:
           source-dir: force-app
           require-permission-set: "true"
@@ -37,4 +37,4 @@ jobs:
           # require-data-sensitivity: "true"
           # require-compliance: "true"
           # Or keep all of the above in a committed policy file:
-          # policy-file: ".codeyci/field-policy.json"
+          # policy-file: ".cairnci/field-policy.json"

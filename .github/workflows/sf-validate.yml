@@ -35,7 +35,7 @@ on:
         description: "Path to an optional JSON config file in the consumer repo."
         required: false
         type: string
-        default: ".codeyci/config.json"
+        default: ".cairnci/config.json"
       # The settings below resolve as: explicit input (if non-empty) > config file
       # value > built-in default. Leave them unset to take them from the config file.
       source-dir:
@@ -73,12 +73,12 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     steps:
       - name: Checkout (full history for delta)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
 
@@ -136,7 +136,7 @@ jobs:
           EOF
 
       - name: Cache Salesforce toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.npm-global
@@ -270,7 +270,7 @@ jobs:
 
       - name: Upload validation job-id
         if: steps.validate.outputs.job-id != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sf-validation-${{ github.event.pull_request.head.sha }}
           path: validation.json
