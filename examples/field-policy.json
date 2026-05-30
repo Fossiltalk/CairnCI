@@ -1,0 +1,13 @@
+{
+  "requirePermissionSet": true,
+  "requiredPermissionSets": [
+    { "permissionSet": "Sales_PS", "access": "edit", "objects": ["Opportunity", "Account"] }
+  ],
+  "requireDescription": true,
+  "requireHelpText": false,
+  "requireDataOwner": true,
+  "requireFieldUsage": false,
+  "requireDataSensitivity": true,
+  "requireCompliance": true,
+  "forbidBreakingFieldChanges": true
+}

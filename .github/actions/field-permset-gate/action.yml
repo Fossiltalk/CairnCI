@@ -1,0 +1,85 @@
+name: "Field permission-set governance gate"
+description: >-
+  Fail the build when newly added custom fields are not granted in at least one
+  permission set, or do not meet configured governance requirements (specific
+  permission-set access, Data Owner, help text, description, Field Usage, Data
+  Sensitivity Level, Compliance Categorization). Can also block breaking changes
+  to existing fields (type/length/precision/scale/required).
+
+inputs:
+  # Settings resolve as: explicit input (if non-empty) > policy-file value >
+  # built-in default. Leave an input unset to take it from the policy file.
+  source-dir:
+    description: "SFDX source directory to scan. Default: force-app."
+    required: false
+    default: ""
+  base-ref:
+    description: "Git ref to diff against to find newly added fields."
+    required: false
+    default: "origin/${{ github.base_ref }}"
+  require-permission-set:
+    description: "Block new fields not granted in >= 1 permission set. Default: true."
+    required: false
+    default: ""
+  required-permission-sets:
+    description: >-
+      JSON array of rules requiring specific access in specific permission sets, e.g.
+      '[{"permissionSet":"Sales_PS","access":"edit","objects":["Opportunity"]}]'.
+      access is 'read' or 'edit'. Omit "objects" to apply to all new fields.
+    required: false
+    default: ""
+  require-description:
+    description: "Require <description> on new fields."
+    required: false
+    default: ""
+  require-help-text:
+    description: "Require <inlineHelpText> on new fields."
+    required: false
+    default: ""
+  require-data-owner:
+    description: "Require Data Owner (<businessOwner>/<businessOwnerGroup>) on new fields."
+    required: false
+    default: ""
+  require-field-usage:
+    description: "Require Field Usage (<businessStatus>) on new fields."
+    required: false
+    default: ""
+  require-data-sensitivity:
+    description: "Require Data Sensitivity Level (<securityClassification>) on new fields."
+    required: false
+    default: ""
+  require-compliance:
+    description: "Require Compliance Categorization (<complianceGroup>) on new fields."
+    required: false
+    default: ""
+  forbid-breaking-field-changes:
+    description: >-
+      Block breaking changes to EXISTING fields: a changed <type>, a reduced text
+      <length> or number <precision>/<scale>, or a field becoming <required>true.
+      Default: false.
+    required: false
+    default: ""
+  policy-file:
+    description: "Optional JSON policy file. Explicit (non-empty) inputs above override its keys; its keys override built-in defaults."
+    required: false
+    default: ".cairnci/field-policy.json"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Run field governance gate"
+      shell: bash
+      env:
+        INPUT_SOURCE_DIR: ${{ inputs.source-dir }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_REQUIRE_PERMISSION_SET: ${{ inputs.require-permission-set }}
+        INPUT_REQUIRED_PERMISSION_SETS: ${{ inputs.required-permission-sets }}
+        INPUT_REQUIRE_DESCRIPTION: ${{ inputs.require-description }}
+        INPUT_REQUIRE_HELP_TEXT: ${{ inputs.require-help-text }}
+        INPUT_REQUIRE_DATA_OWNER: ${{ inputs.require-data-owner }}
+        INPUT_REQUIRE_FIELD_USAGE: ${{ inputs.require-field-usage }}
+        INPUT_REQUIRE_DATA_SENSITIVITY: ${{ inputs.require-data-sensitivity }}
+        INPUT_REQUIRE_COMPLIANCE: ${{ inputs.require-compliance }}
+        INPUT_FORBID_BREAKING_FIELD_CHANGES: ${{ inputs.forbid-breaking-field-changes }}
+        INPUT_POLICY_FILE: ${{ inputs.policy-file }}
+      run: node "${{ github.action_path }}/index.mjs"

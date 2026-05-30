@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Salesforce App",
+  "license": "Apache-2.0",
   "scripts": {
     "lint": "eslint **/{aura,lwc}/**/*.js",
     "test": "npm run test:unit",
