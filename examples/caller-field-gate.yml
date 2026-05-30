@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - uses: Fossiltalk/salesforceci/.github/actions/field-permset-gate@v1
+      - uses: Fossiltalk/CodeyCI/.github/actions/field-permset-gate@v1
         with:
           source-dir: force-app
           require-permission-set: "true"
@@ -34,4 +34,4 @@ jobs:
           # require-data-sensitivity: "true"
           # require-compliance: "true"
           # Or keep all of the above in a committed policy file:
-          # policy-file: ".salesforceci/field-policy.json"
+          # policy-file: ".codeyci/field-policy.json"

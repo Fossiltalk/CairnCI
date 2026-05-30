@@ -35,7 +35,7 @@ fails the check, which you can make a required status check via branch protectio
 
 Add it as a step in a PR workflow — see
 [`examples/caller-field-gate.yml`](../examples/caller-field-gate.yml). Reference the
-action by released tag: `Fossiltalk/salesforceci/.github/actions/field-permset-gate@v1`.
+action by released tag: `Fossiltalk/CodeyCI/.github/actions/field-permset-gate@v1`.
 
 ## Policy file
 

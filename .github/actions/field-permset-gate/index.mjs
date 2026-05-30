@@ -11,28 +11,52 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import path from "node:path";
 
-const bool = (v) => String(v).toLowerCase() === "true";
+const bool = (v) => v === true || String(v).toLowerCase() === "true";
 
-// ---- Config: inputs, optionally overridden by a JSON policy file ----
-const cfg = {
-  sourceDir: process.env.INPUT_SOURCE_DIR || "force-app",
-  baseRef: process.env.INPUT_BASE_REF || "",
-  requirePermissionSet: bool(process.env.INPUT_REQUIRE_PERMISSION_SET),
-  requiredPermissionSets: parseJson(process.env.INPUT_REQUIRED_PERMISSION_SETS, []),
-  requireDescription: bool(process.env.INPUT_REQUIRE_DESCRIPTION),
-  requireHelpText: bool(process.env.INPUT_REQUIRE_HELP_TEXT),
-  requireDataOwner: bool(process.env.INPUT_REQUIRE_DATA_OWNER),
-  requireFieldUsage: bool(process.env.INPUT_REQUIRE_FIELD_USAGE),
-  requireDataSensitivity: bool(process.env.INPUT_REQUIRE_DATA_SENSITIVITY),
-  requireCompliance: bool(process.env.INPUT_REQUIRE_COMPLIANCE),
+// Treat empty/unset inputs as "not provided" so the precedence chain works.
+const inBool = (v) => (v === undefined || v === "" ? undefined : bool(v));
+const inStr = (v) => (v === undefined || v === "" ? undefined : v);
+const inJson = (v) => (v === undefined || String(v).trim() === "" ? undefined : parseJson(v, undefined));
+
+// ---- Config precedence: explicit input > policy file > built-in default ----
+const builtin = {
+  sourceDir: "force-app",
+  baseRef: "",
+  requirePermissionSet: true,
+  requiredPermissionSets: [],
+  requireDescription: false,
+  requireHelpText: false,
+  requireDataOwner: false,
+  requireFieldUsage: false,
+  requireDataSensitivity: false,
+  requireCompliance: false,
 };
 
 const policyFile = process.env.INPUT_POLICY_FILE || "";
+let fileCfg = {};
 if (policyFile && existsSync(policyFile)) {
-  const policy = parseJson(readFileSync(policyFile, "utf8"), {});
-  Object.assign(cfg, policy);
-  console.log(`Loaded policy overrides from ${policyFile}`);
+  fileCfg = parseJson(readFileSync(policyFile, "utf8"), {});
+  console.log(`Loaded policy from ${policyFile}`);
 }
+
+const pick = (key, inputVal) => {
+  if (inputVal !== undefined) return inputVal;
+  if (fileCfg[key] !== undefined && fileCfg[key] !== "") return fileCfg[key];
+  return builtin[key];
+};
+
+const cfg = {
+  sourceDir: pick("sourceDir", inStr(process.env.INPUT_SOURCE_DIR)),
+  baseRef: pick("baseRef", inStr(process.env.INPUT_BASE_REF)),
+  requirePermissionSet: pick("requirePermissionSet", inBool(process.env.INPUT_REQUIRE_PERMISSION_SET)),
+  requiredPermissionSets: pick("requiredPermissionSets", inJson(process.env.INPUT_REQUIRED_PERMISSION_SETS)),
+  requireDescription: pick("requireDescription", inBool(process.env.INPUT_REQUIRE_DESCRIPTION)),
+  requireHelpText: pick("requireHelpText", inBool(process.env.INPUT_REQUIRE_HELP_TEXT)),
+  requireDataOwner: pick("requireDataOwner", inBool(process.env.INPUT_REQUIRE_DATA_OWNER)),
+  requireFieldUsage: pick("requireFieldUsage", inBool(process.env.INPUT_REQUIRE_FIELD_USAGE)),
+  requireDataSensitivity: pick("requireDataSensitivity", inBool(process.env.INPUT_REQUIRE_DATA_SENSITIVITY)),
+  requireCompliance: pick("requireCompliance", inBool(process.env.INPUT_REQUIRE_COMPLIANCE)),
+};
 
 function parseJson(raw, fallback) {
   if (!raw || !String(raw).trim()) return fallback;

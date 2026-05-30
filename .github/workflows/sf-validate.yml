@@ -31,26 +31,33 @@ on:
         required: false
         type: string
         default: "latest"
+      config-file:
+        description: "Path to an optional JSON config file in the consumer repo."
+        required: false
+        type: string
+        default: ".codeyci/config.json"
+      # The settings below resolve as: explicit input (if non-empty) > config file
+      # value > built-in default. Leave them unset to take them from the config file.
       source-dir:
-        description: "SFDX source directory."
+        description: "SFDX source directory. Default: force-app."
         required: false
         type: string
-        default: "force-app"
+        default: ""
       test-level:
-        description: "Apex test level: NoTestRun | RunSpecifiedTests | RunLocalTests | RunAllTestsInOrg."
+        description: "Apex test level: NoTestRun | RunSpecifiedTests | RunLocalTests | RunAllTestsInOrg. Default: RunLocalTests."
         required: false
         type: string
-        default: "RunLocalTests"
+        default: ""
       tests:
         description: "Space/comma separated test classes when test-level is RunSpecifiedTests."
         required: false
         type: string
         default: ""
       wait:
-        description: "Minutes to wait for validation."
+        description: "Minutes to wait for validation. Default: 60."
         required: false
         type: string
-        default: "60"
+        default: ""
     # Callers must use `secrets: inherit` so `secrets.SFDX_AUTH_URL` resolves
     # (repo-level for PR validation, or environment-scoped if the caller job is
     # environment-bound). See sf-deploy.yml for why we don't declare it explicitly.
@@ -69,6 +76,56 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
+
+      - name: Resolve configuration (input > config file > default)
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config-file }}
+          IN_SOURCE_DIR: ${{ inputs.source-dir }}
+          IN_TEST_LEVEL: ${{ inputs.test-level }}
+          IN_TESTS: ${{ inputs.tests }}
+          IN_WAIT: ${{ inputs.wait }}
+          IN_ROLLBACK_STRATEGY: ""
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const cfgPath = process.env.CONFIG_FILE || "";
+          let cfg = {};
+          if (cfgPath && fs.existsSync(cfgPath)) {
+            try { cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")); console.log("Loaded config from " + cfgPath); }
+            catch (e) { console.log("::warning::Could not parse " + cfgPath + ": " + e.message); }
+          } else {
+            console.log("No config file at '" + cfgPath + "' — using inputs/defaults.");
+          }
+          const defaults = { sourceDir: "force-app", testLevel: "RunLocalTests", tests: "", wait: "60", rollbackStrategy: "none" };
+          const inputs = {
+            sourceDir: process.env.IN_SOURCE_DIR,
+            testLevel: process.env.IN_TEST_LEVEL,
+            tests: process.env.IN_TESTS,
+            wait: process.env.IN_WAIT,
+            rollbackStrategy: process.env.IN_ROLLBACK_STRATEGY,
+          };
+          const pick = (k) => {
+            const i = inputs[k];
+            if (i !== undefined && i !== "") return i;
+            if (cfg[k] !== undefined && String(cfg[k]) !== "") return String(cfg[k]);
+            return defaults[k];
+          };
+          const map = {
+            EFFECTIVE_SOURCE_DIR: "sourceDir",
+            EFFECTIVE_TEST_LEVEL: "testLevel",
+            EFFECTIVE_TESTS: "tests",
+            EFFECTIVE_WAIT: "wait",
+            EFFECTIVE_ROLLBACK_STRATEGY: "rollbackStrategy",
+          };
+          let out = "";
+          for (const [envName, key] of Object.entries(map)) {
+            const v = pick(key);
+            out += envName + "=" + v + "\n";
+            console.log("resolved " + envName + "=" + v);
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, out);
+          EOF
 
       - name: Cache Salesforce toolchain
         uses: actions/cache@v4
@@ -128,7 +185,7 @@ jobs:
         id: delta
         shell: bash
         env:
-          SRC_DIR: ${{ inputs.source-dir }}
+          SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
@@ -153,10 +210,10 @@ jobs:
         if: steps.delta.outputs.has-changes == 'true'
         shell: bash
         env:
-          SRC_DIR: ${{ inputs.source-dir }}
-          TEST_LEVEL: ${{ inputs.test-level }}
-          TESTS: ${{ inputs.tests }}
-          WAIT: ${{ inputs.wait }}
+          SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
+          TEST_LEVEL: ${{ env.EFFECTIVE_TEST_LEVEL }}
+          TESTS: ${{ env.EFFECTIVE_TESTS }}
+          WAIT: ${{ env.EFFECTIVE_WAIT }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail

@@ -1,7 +1,7 @@
 # Dogfood caller: validate this repo's own metadata on every PR.
 # This is also the reference example for consumers (see examples/caller-validate.yml),
 # except a consumer would call the reusable workflow by full path + version tag:
-#   uses: Fossiltalk/salesforceci/.github/workflows/sf-validate.yml@v1
+#   uses: Fossiltalk/CodeyCI/.github/workflows/sf-validate.yml@v1
 name: CI Validate
 
 on:

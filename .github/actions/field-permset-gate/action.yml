@@ -6,18 +6,20 @@ description: >-
   Sensitivity Level, Compliance Categorization).
 
 inputs:
+  # Settings resolve as: explicit input (if non-empty) > policy-file value >
+  # built-in default. Leave an input unset to take it from the policy file.
   source-dir:
-    description: "SFDX source directory to scan."
+    description: "SFDX source directory to scan. Default: force-app."
     required: false
-    default: "force-app"
+    default: ""
   base-ref:
     description: "Git ref to diff against to find newly added fields."
     required: false
     default: "origin/${{ github.base_ref }}"
   require-permission-set:
-    description: "Block new fields not granted in >= 1 permission set."
+    description: "Block new fields not granted in >= 1 permission set. Default: true."
     required: false
-    default: "true"
+    default: ""
   required-permission-sets:
     description: >-
       JSON array of rules requiring specific access in specific permission sets, e.g.
@@ -28,31 +30,31 @@ inputs:
   require-description:
     description: "Require <description> on new fields."
     required: false
-    default: "false"
+    default: ""
   require-help-text:
     description: "Require <inlineHelpText> on new fields."
     required: false
-    default: "false"
+    default: ""
   require-data-owner:
     description: "Require Data Owner (<businessOwner>/<businessOwnerGroup>) on new fields."
     required: false
-    default: "false"
+    default: ""
   require-field-usage:
     description: "Require Field Usage (<businessStatus>) on new fields."
     required: false
-    default: "false"
+    default: ""
   require-data-sensitivity:
     description: "Require Data Sensitivity Level (<securityClassification>) on new fields."
     required: false
-    default: "false"
+    default: ""
   require-compliance:
     description: "Require Compliance Categorization (<complianceGroup>) on new fields."
     required: false
-    default: "false"
+    default: ""
   policy-file:
-    description: "Optional JSON policy file whose keys override the inputs above."
+    description: "Optional JSON policy file. Explicit (non-empty) inputs above override its keys; its keys override built-in defaults."
     required: false
-    default: ".salesforceci/field-policy.json"
+    default: ".codeyci/field-policy.json"
 
 runs:
   using: "composite"

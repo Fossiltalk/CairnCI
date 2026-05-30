@@ -14,7 +14,7 @@ on:
 
 jobs:
   deploy:
-    uses: Fossiltalk/salesforceci/.github/workflows/sf-deploy.yml@v1
+    uses: Fossiltalk/CodeyCI/.github/workflows/sf-deploy.yml@v1
     with:
       environment: ${{ github.ref_name }} # branch name == environment name
       source-dir: force-app

@@ -1,7 +1,17 @@
-salesforceci
+CodeyCI
 Copyright 2026 Fossiltalk
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+NOT AFFILIATED WITH SALESFORCE
+  CodeyCI is an independent, community-maintained open-source project. It is not
+  affiliated with, endorsed by, sponsored by, or supported by Salesforce, Inc.
+  "Salesforce", "Salesforce DX", "SFDX", "Codey" (the Salesforce mascot), and
+  related names and logos are trademarks of Salesforce, Inc. The project name
+  "CodeyCI" and this documentation reference those marks only nominatively, to
+  describe the platform and tools that CodeyCI interoperates with. No affiliation,
+  endorsement, or trademark rights are claimed or granted. If Salesforce, Inc.
+  requests it, the project will be renamed.
 
 This software invokes, but does not redistribute, third-party tools at runtime,
 each under its own license, including:
