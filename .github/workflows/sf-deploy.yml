@@ -104,6 +104,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Pre-flight checks
+        shell: bash
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          if [ -z "${SFDX_AUTH_URL:-}" ]; then
+            echo "::error::SFDX_AUTH_URL secret is empty or not set." >&2
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -219,10 +229,6 @@ jobs:
           SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
         run: |
           set -euo pipefail
-          if [ -z "${SFDX_AUTH_URL:-}" ]; then
-            echo "::error::SFDX_AUTH_URL secret is empty." >&2
-            exit 1
-          fi
           authfile="$(mktemp)"
           trap 'rm -f "$authfile"' EXIT
           printf '%s' "$SFDX_AUTH_URL" > "$authfile"
