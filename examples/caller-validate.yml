@@ -15,10 +15,11 @@ jobs:
       # All inputs are optional; defaults shown for reference.
       source-dir: force-app
       test-level: RunLocalTests # NoTestRun | RunSpecifiedTests | RunLocalTests | RunAllTestsInOrg
+      # Defaults: node-version "lts/*", sf-cli-version "latest", sgd-version "stable".
       # Pin the toolchain if you need reproducibility:
-      # node-version: "20"
-      # sf-cli-version: "2.69.6"
-      # sgd-version: "5.45.0"
+      # node-version: "22"
+      # sf-cli-version: "2.136.8"
+      # sgd-version: "6.31.0"
       # Use your own runners:
       # runs-on: '["self-hosted","linux"]'
     # Required: lets the reusable workflow read your SFDX_AUTH_URL secret.
