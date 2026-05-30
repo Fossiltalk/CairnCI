@@ -234,9 +234,9 @@ The field gate follows the same precedence with its own
 | `delta`          | `true`           | `true` = only changed metadata (sfdx-git-delta); `false` = whole `source-dir`. See §5b. |
 | `test-level`     | `RunLocalTests`  | `NoTestRun` / `RunSpecifiedTests` / `RunLocalTests` / `RunAllTestsInOrg`. |
 | `tests`          | `""`             | Space/comma separated classes when `RunSpecifiedTests`. |
-| `node-version`   | `20`             | sfdx-git-delta requires >= 20. |
+| `node-version`   | `lts/*`          | Latest Node LTS. sfdx-git-delta requires >= 20. |
 | `sf-cli-version` | `latest`         | npm dist-tag or exact version. |
-| `sgd-version`    | `latest`         | sfdx-git-delta version. |
+| `sgd-version`    | `stable`         | sfdx-git-delta dist-tag or exact version. |
 | `runs-on`        | `["ubuntu-latest"]` | JSON array string. Self-hosted: `'["self-hosted","linux"]'`. |
 | `wait`           | `60`             | Minutes to wait for the org job. |
 | `environment`    | `""` (deploy only) | GitHub Environment to deploy to. |

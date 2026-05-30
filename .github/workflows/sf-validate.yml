@@ -17,20 +17,20 @@ on:
         type: string
         default: '["ubuntu-latest"]'
       node-version:
-        description: "Node.js version (sfdx-git-delta requires >= 20)."
+        description: "Node.js version. Default 'lts/*' (latest LTS). sfdx-git-delta requires >= 20."
         required: false
         type: string
-        default: "20"
+        default: "lts/*"
       sf-cli-version:
         description: "@salesforce/cli version (npm dist-tag or exact version)."
         required: false
         type: string
         default: "latest"
       sgd-version:
-        description: "sfdx-git-delta plugin version (npm dist-tag or exact version)."
+        description: "sfdx-git-delta plugin version (npm dist-tag or exact version). Default 'stable'."
         required: false
         type: string
-        default: "latest"
+        default: "stable"
       config-file:
         description: "Path to an optional JSON config file in the consumer repo."
         required: false
