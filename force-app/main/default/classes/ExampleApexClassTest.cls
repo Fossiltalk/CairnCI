@@ -1,29 +1,37 @@
-/**
- * This class contains unit tests for validating the behavior of Apex classes
- * and triggers.
- *
- * Unit tests are class methods that verify whether a particular piece
- * of code is working properly. Unit test methods take no arguments,
- * commit no data to the database, and are flagged with the testMethod
- * keyword in the method definition.
- *
- * All test methods in an org are executed whenever Apex code is deployed
- * to a production org to confirm correctness, ensure code
- * coverage, and prevent regressions. All Apex classes are
- * required to have at least 75% code coverage in order to be deployed
- * to a production org. In addition, all triggers must have some code coverage.
- * 
- * The @isTest class annotation indicates this class only contains test
- * methods. Classes defined with the @isTest annotation do not count against
- * the org size limit for all Apex scripts.
- *
- * See the Apex Language Reference for more information about Testing and Code Coverage.
- */
 @isTest
 private class ExampleApexClassTest {
 
     @isTest
-    static void myUnitTest() {
-        // TO DO: implement unit test
+    static void testSmallLimit() {
+        List<Integer> primes = ExampleApexClass.sieve(10);
+        System.assertEquals(4, primes.size());
+        System.assertEquals(2, primes[0]);
+        System.assertEquals(3, primes[1]);
+        System.assertEquals(5, primes[2]);
+        System.assertEquals(7, primes[3]);
+    }
+
+    @isTest
+    static void testPrimesUpTo50() {
+        List<Integer> primes = ExampleApexClass.sieve(50);
+        // Known primes up to 50
+        List<Integer> expected = new List<Integer>{2,3,5,7,11,13,17,19,23,29,31,37,41,43,47};
+        System.assertEquals(expected.size(), primes.size());
+        for (Integer i = 0; i < expected.size(); i++) {
+            System.assertEquals(expected[i], primes[i]);
+        }
+    }
+
+    @isTest
+    static void testBelowTwo() {
+        System.assertEquals(0, ExampleApexClass.sieve(1).size());
+        System.assertEquals(0, ExampleApexClass.sieve(0).size());
+    }
+
+    @isTest
+    static void testExactPrimeBoundary() {
+        List<Integer> primes = ExampleApexClass.sieve(2);
+        System.assertEquals(1, primes.size());
+        System.assertEquals(2, primes[0]);
     }
 }
