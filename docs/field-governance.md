@@ -25,6 +25,18 @@ For every custom field **added** in the PR (under `<source-dir>/**/fields/*.fiel
 Fields that **cannot** carry field-level security are automatically exempted from the
 permission-set checks: `MasterDetail` fields and `required` fields.
 
+### Breaking changes to existing fields (`forbid-breaking-field-changes`, default off)
+
+For every custom field **modified** in the PR, this blocks changes that can fail a
+deploy or destroy data:
+
+- the field `<type>` changed (e.g. `Text` → `Number`);
+- a text `<length>`, or a number `<precision>` / `<scale>`, was **reduced**;
+- the field became `<required>true`.
+
+Comparison is against the merge base, so only changes introduced by the PR are
+considered. (Widening — e.g. a larger `length` — is allowed.)
+
 ## How failures surface
 
 Each violation is emitted as an inline `::error` annotation on the offending

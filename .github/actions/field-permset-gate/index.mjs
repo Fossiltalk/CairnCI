@@ -30,6 +30,7 @@ const builtin = {
   requireFieldUsage: false,
   requireDataSensitivity: false,
   requireCompliance: false,
+  forbidBreakingFieldChanges: false,
 };
 
 const policyFile = process.env.INPUT_POLICY_FILE || "";
@@ -56,6 +57,7 @@ const cfg = {
   requireFieldUsage: pick("requireFieldUsage", inBool(process.env.INPUT_REQUIRE_FIELD_USAGE)),
   requireDataSensitivity: pick("requireDataSensitivity", inBool(process.env.INPUT_REQUIRE_DATA_SENSITIVITY)),
   requireCompliance: pick("requireCompliance", inBool(process.env.INPUT_REQUIRE_COMPLIANCE)),
+  forbidBreakingFieldChanges: pick("forbidBreakingFieldChanges", inBool(process.env.INPUT_FORBID_BREAKING_FIELD_CHANGES)),
 };
 
 function parseJson(raw, fallback) {
@@ -94,6 +96,66 @@ function addedFieldFiles() {
     );
   }
   return out.split("\n").map((s) => s.trim()).filter(Boolean);
+}
+
+// Resolve a single base commit to compare against (the merge base when possible),
+// so we can both list modified files and read their previous content.
+function baseCommit() {
+  const ref = cfg.baseRef && cfg.baseRef !== "origin/" ? cfg.baseRef : "HEAD^";
+  try {
+    return execFileSync("git", ["merge-base", ref, "HEAD"], { encoding: "utf8" }).trim() || ref;
+  } catch {
+    return ref;
+  }
+}
+
+// Field files modified (not added/deleted) between the base and HEAD.
+function modifiedFieldFiles(base) {
+  try {
+    const out = execFileSync(
+      "git",
+      ["diff", "--name-only", "--diff-filter=M", base, "HEAD", "--", `${cfg.sourceDir}/**/fields/*.field-meta.xml`],
+      { encoding: "utf8" }
+    );
+    return out.split("\n").map((s) => s.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Content of a file at the base commit (empty string if unavailable).
+function fileAt(base, file) {
+  try {
+    return execFileSync("git", ["show", `${base}:${file}`], { encoding: "utf8" });
+  } catch {
+    return "";
+  }
+}
+
+// Compare an old/new field definition and return human-readable breaking reasons.
+function breakingReasons(oldXml, newXml) {
+  const reasons = [];
+  const oType = tag(oldXml, "type");
+  const nType = tag(newXml, "type");
+  if (oType && nType && oType !== nType) reasons.push(`type changed (${oType} → ${nType})`);
+
+  const num = (xml, name) => {
+    const v = parseInt(tag(xml, name), 10);
+    return Number.isNaN(v) ? null : v;
+  };
+  const shrink = (name, label) => {
+    const o = num(oldXml, name);
+    const n = num(newXml, name);
+    if (o !== null && n !== null && n < o) reasons.push(`${label} reduced (${o} → ${n})`);
+  };
+  shrink("length", "text length");
+  shrink("precision", "precision");
+  shrink("scale", "scale");
+
+  if (!bool(tag(oldXml, "required")) && bool(tag(newXml, "required"))) {
+    reasons.push("field became required");
+  }
+  return reasons;
 }
 
 // Object API name and field API name from the file path.
@@ -197,13 +259,31 @@ for (const file of files) {
   }
 }
 
+// ---- 3d. Breaking changes to existing (modified) fields ----
+let modifiedCount = 0;
+if (cfg.forbidBreakingFieldChanges) {
+  const base = baseCommit();
+  const modified = modifiedFieldFiles(base);
+  modifiedCount = modified.length;
+  for (const file of modified) {
+    if (!existsSync(file)) continue;
+    const newXml = readFileSync(file, "utf8");
+    const oldXml = fileAt(base, file);
+    if (!oldXml) continue;
+    const { qualified } = identify(file);
+    for (const reason of breakingReasons(oldXml, newXml)) {
+      violations.push({ file, message: `${qualified} has a breaking field change: ${reason}.` });
+    }
+  }
+}
+
 // ---- 4. Report ----
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 function summary(md) {
   if (summaryPath) appendFileSync(summaryPath, md + "\n");
 }
 
-console.log(`Checked ${files.length} newly added field(s).`);
+console.log(`Checked ${files.length} newly added field(s)${cfg.forbidBreakingFieldChanges ? ` and ${modifiedCount} modified field(s) for breaking changes` : ""}.`);
 if (violations.length === 0) {
   summary(`### ✅ Field governance gate passed\n\nChecked ${files.length} newly added field(s); no violations.`);
   console.log("Field governance gate passed.");

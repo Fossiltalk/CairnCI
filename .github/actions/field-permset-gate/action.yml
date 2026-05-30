@@ -3,7 +3,8 @@ description: >-
   Fail the build when newly added custom fields are not granted in at least one
   permission set, or do not meet configured governance requirements (specific
   permission-set access, Data Owner, help text, description, Field Usage, Data
-  Sensitivity Level, Compliance Categorization).
+  Sensitivity Level, Compliance Categorization). Can also block breaking changes
+  to existing fields (type/length/precision/scale/required).
 
 inputs:
   # Settings resolve as: explicit input (if non-empty) > policy-file value >
@@ -51,6 +52,13 @@ inputs:
     description: "Require Compliance Categorization (<complianceGroup>) on new fields."
     required: false
     default: ""
+  forbid-breaking-field-changes:
+    description: >-
+      Block breaking changes to EXISTING fields: a changed <type>, a reduced text
+      <length> or number <precision>/<scale>, or a field becoming <required>true.
+      Default: false.
+    required: false
+    default: ""
   policy-file:
     description: "Optional JSON policy file. Explicit (non-empty) inputs above override its keys; its keys override built-in defaults."
     required: false
@@ -72,5 +80,6 @@ runs:
         INPUT_REQUIRE_FIELD_USAGE: ${{ inputs.require-field-usage }}
         INPUT_REQUIRE_DATA_SENSITIVITY: ${{ inputs.require-data-sensitivity }}
         INPUT_REQUIRE_COMPLIANCE: ${{ inputs.require-compliance }}
+        INPUT_FORBID_BREAKING_FIELD_CHANGES: ${{ inputs.forbid-breaking-field-changes }}
         INPUT_POLICY_FILE: ${{ inputs.policy-file }}
       run: node "${{ github.action_path }}/index.mjs"

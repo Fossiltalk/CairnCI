@@ -19,11 +19,14 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "lts/*"
       - uses: Fossiltalk/CodeyCI/.github/actions/field-permset-gate@v1
         with:
           source-dir: force-app
           require-permission-set: "true"
+          # Block breaking changes (type change, length/precision/scale reduction,
+          # newly-required) on existing fields:
+          # forbid-breaking-field-changes: "true"
           # Require specific access in specific permission sets:
           # required-permission-sets: '[{"permissionSet":"Sales_PS","access":"edit","objects":["Opportunity"]}]'
           # Require governance metadata on new fields:
