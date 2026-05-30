@@ -5,7 +5,7 @@
       "default": true
     }
   ],
-  "name": "salesforceci",
+  "name": "CodeyCI",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "61.0"

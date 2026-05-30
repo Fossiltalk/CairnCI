@@ -1,0 +1,249 @@
+# Reusable workflow: validate a pull request against a Salesforce org.
+#
+# Consumers call this from a thin caller workflow triggered on pull_request.
+# It performs a delta-only, check-only validation (no changes are committed to
+# the org) and publishes the resulting validation job-id as an artifact so a
+# later quick deploy can reuse it.
+#
+# See docs/consumer-setup.md and examples/caller-validate.yml.
+name: Salesforce Validate (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: "Runner label(s) as a JSON array string. e.g. '[\"ubuntu-latest\"]' or '[\"self-hosted\",\"linux\"]'."
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
+      node-version:
+        description: "Node.js version (sfdx-git-delta requires >= 20)."
+        required: false
+        type: string
+        default: "20"
+      sf-cli-version:
+        description: "@salesforce/cli version (npm dist-tag or exact version)."
+        required: false
+        type: string
+        default: "latest"
+      sgd-version:
+        description: "sfdx-git-delta plugin version (npm dist-tag or exact version)."
+        required: false
+        type: string
+        default: "latest"
+      config-file:
+        description: "Path to an optional JSON config file in the consumer repo."
+        required: false
+        type: string
+        default: ".codeyci/config.json"
+      # The settings below resolve as: explicit input (if non-empty) > config file
+      # value > built-in default. Leave them unset to take them from the config file.
+      source-dir:
+        description: "SFDX source directory. Default: force-app."
+        required: false
+        type: string
+        default: ""
+      test-level:
+        description: "Apex test level: NoTestRun | RunSpecifiedTests | RunLocalTests | RunAllTestsInOrg. Default: RunLocalTests."
+        required: false
+        type: string
+        default: ""
+      tests:
+        description: "Space/comma separated test classes when test-level is RunSpecifiedTests."
+        required: false
+        type: string
+        default: ""
+      wait:
+        description: "Minutes to wait for validation. Default: 60."
+        required: false
+        type: string
+        default: ""
+    # Callers must use `secrets: inherit` so `secrets.SFDX_AUTH_URL` resolves
+    # (repo-level for PR validation, or environment-scoped if the caller job is
+    # environment-bound). See sf-deploy.yml for why we don't declare it explicitly.
+
+jobs:
+  validate:
+    name: Validate delta
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    steps:
+      - name: Checkout (full history for delta)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Resolve configuration (input > config file > default)
+        shell: bash
+        env:
+          CONFIG_FILE: ${{ inputs.config-file }}
+          IN_SOURCE_DIR: ${{ inputs.source-dir }}
+          IN_TEST_LEVEL: ${{ inputs.test-level }}
+          IN_TESTS: ${{ inputs.tests }}
+          IN_WAIT: ${{ inputs.wait }}
+          IN_ROLLBACK_STRATEGY: ""
+        run: |
+          node <<'EOF'
+          const fs = require("fs");
+          const cfgPath = process.env.CONFIG_FILE || "";
+          let cfg = {};
+          if (cfgPath && fs.existsSync(cfgPath)) {
+            try { cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")); console.log("Loaded config from " + cfgPath); }
+            catch (e) { console.log("::warning::Could not parse " + cfgPath + ": " + e.message); }
+          } else {
+            console.log("No config file at '" + cfgPath + "' — using inputs/defaults.");
+          }
+          const defaults = { sourceDir: "force-app", testLevel: "RunLocalTests", tests: "", wait: "60", rollbackStrategy: "none" };
+          const inputs = {
+            sourceDir: process.env.IN_SOURCE_DIR,
+            testLevel: process.env.IN_TEST_LEVEL,
+            tests: process.env.IN_TESTS,
+            wait: process.env.IN_WAIT,
+            rollbackStrategy: process.env.IN_ROLLBACK_STRATEGY,
+          };
+          const pick = (k) => {
+            const i = inputs[k];
+            if (i !== undefined && i !== "") return i;
+            if (cfg[k] !== undefined && String(cfg[k]) !== "") return String(cfg[k]);
+            return defaults[k];
+          };
+          const map = {
+            EFFECTIVE_SOURCE_DIR: "sourceDir",
+            EFFECTIVE_TEST_LEVEL: "testLevel",
+            EFFECTIVE_TESTS: "tests",
+            EFFECTIVE_WAIT: "wait",
+            EFFECTIVE_ROLLBACK_STRATEGY: "rollbackStrategy",
+          };
+          let out = "";
+          for (const [envName, key] of Object.entries(map)) {
+            const v = pick(key);
+            out += envName + "=" + v + "\n";
+            console.log("resolved " + envName + "=" + v);
+          }
+          fs.appendFileSync(process.env.GITHUB_ENV, out);
+          EOF
+
+      - name: Cache Salesforce toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm-global
+            ~/.local/share/sf
+            ~/.sf
+          key: sf-toolchain-${{ runner.os }}-node${{ inputs.node-version }}-cli${{ inputs.sf-cli-version }}-sgd${{ inputs.sgd-version }}
+
+      - name: Install Salesforce CLI + sfdx-git-delta
+        shell: bash
+        env:
+          SF_CLI_VERSION: ${{ inputs.sf-cli-version }}
+          SGD_VERSION: ${{ inputs.sgd-version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.npm-global"
+          npm config set prefix "$HOME/.npm-global"
+          echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.npm-global/bin:$PATH"
+
+          cliWanted="$(npm view "@salesforce/cli@${SF_CLI_VERSION}" version)"
+          cliInstalled="$(sf version 2>/dev/null | sed -n 's#.*@salesforce/cli/\([0-9][0-9.]*\).*#\1#p' | head -n1 || true)"
+          if [ "$cliInstalled" = "$cliWanted" ]; then
+            echo "sf CLI $cliInstalled already installed — skipping."
+          else
+            npm install --global "@salesforce/cli@${cliWanted}"
+          fi
+          sf version
+
+          sgdWanted="$(npm view "sfdx-git-delta@${SGD_VERSION}" version)"
+          sgdInstalled="$(sf plugins 2>/dev/null | sed -n 's/.*sfdx-git-delta \([0-9][0-9.]*\).*/\1/p' | head -n1 || true)"
+          if [ "$sgdInstalled" = "$sgdWanted" ]; then
+            echo "sfdx-git-delta $sgdInstalled already installed — skipping."
+          else
+            echo y | sf plugins install "sfdx-git-delta@${sgdWanted}"
+          fi
+          sf plugins
+
+      - name: Authenticate to target org
+        shell: bash
+        env:
+          SFDX_AUTH_URL: ${{ secrets.SFDX_AUTH_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SFDX_AUTH_URL:-}" ]; then
+            echo "::error::SFDX_AUTH_URL secret is empty." >&2
+            exit 1
+          fi
+          authfile="$(mktemp)"
+          trap 'rm -f "$authfile"' EXIT
+          printf '%s' "$SFDX_AUTH_URL" > "$authfile"
+          sf org login sfdx-url --sfdx-url-file "$authfile" --alias target-org --set-default
+
+      - name: Generate delta
+        id: delta
+        shell: bash
+        env:
+          SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p changed-sources
+          sf sgd source delta \
+            --from "origin/${BASE_REF}" \
+            --to "HEAD" \
+            --source-dir "$SRC_DIR" \
+            --output-dir changed-sources \
+            --generate-delta
+          echo "----- delta package.xml -----"
+          cat changed-sources/package/package.xml 2>/dev/null || echo "(none)"
+          if grep -q "<types>" changed-sources/package/package.xml 2>/dev/null; then
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-changes=false" >> "$GITHUB_OUTPUT"
+            echo "No deployable metadata changed — nothing to validate."
+          fi
+
+      - name: Validate (check-only)
+        id: validate
+        if: steps.delta.outputs.has-changes == 'true'
+        shell: bash
+        env:
+          SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
+          TEST_LEVEL: ${{ env.EFFECTIVE_TEST_LEVEL }}
+          TESTS: ${{ env.EFFECTIVE_TESTS }}
+          WAIT: ${{ env.EFFECTIVE_WAIT }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          args=(project deploy validate --source-dir "changed-sources/${SRC_DIR}" --test-level "$TEST_LEVEL" --wait "$WAIT" --json)
+          if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
+            if [ -z "${TESTS// /}" ]; then
+              echo "::error::test-level RunSpecifiedTests requires 'tests'." >&2
+              exit 1
+            fi
+            for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
+          fi
+          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
+            args+=(--post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml)
+          fi
+
+          echo "Running: sf ${args[*]}"
+          set +e
+          out="$(sf "${args[@]}")"; code=$?
+          set -e
+          echo "$out"
+          jobId="$(printf '%s' "$out" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{try{const j=JSON.parse(d);process.stdout.write((j.result&&j.result.id)||"")}catch(e){}})')"
+          printf '{"jobId":"%s","sha":"%s"}\n' "$jobId" "${HEAD_SHA:-}" > validation.json
+          echo "job-id=$jobId" >> "$GITHUB_OUTPUT"
+          [ "$code" -eq 0 ] || { echo "::error::Validation failed." >&2; exit "$code"; }
+          echo "Validation OK. job-id=$jobId"
+
+      - name: Upload validation job-id
+        if: steps.validate.outputs.job-id != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf-validation-${{ github.event.pull_request.head.sha }}
+          path: validation.json
+          retention-days: 10

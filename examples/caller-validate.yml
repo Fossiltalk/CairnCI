@@ -1,0 +1,25 @@
+# Drop this in your repo at .github/workflows/sf-validate.yml
+# It validates every pull request against your Salesforce org.
+name: Salesforce Validate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "force-app/**"
+
+jobs:
+  validate:
+    uses: Fossiltalk/CodeyCI/.github/workflows/sf-validate.yml@v1
+    with:
+      # All inputs are optional; defaults shown for reference.
+      source-dir: force-app
+      test-level: RunLocalTests # NoTestRun | RunSpecifiedTests | RunLocalTests | RunAllTestsInOrg
+      # Pin the toolchain if you need reproducibility:
+      # node-version: "20"
+      # sf-cli-version: "2.69.6"
+      # sgd-version: "5.45.0"
+      # Use your own runners:
+      # runs-on: '["self-hosted","linux"]'
+    # Required: lets the reusable workflow read your SFDX_AUTH_URL secret.
+    secrets: inherit
