@@ -8,5 +8,6 @@
   "requireDataOwner": true,
   "requireFieldUsage": false,
   "requireDataSensitivity": true,
-  "requireCompliance": true
+  "requireCompliance": true,
+  "forbidBreakingFieldChanges": true
 }
