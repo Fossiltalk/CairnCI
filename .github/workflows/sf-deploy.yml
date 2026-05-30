@@ -328,12 +328,15 @@ jobs:
             echo "No reusable validation — running a full deploy."
           fi
 
-          args=(project deploy start --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
+            args=(project deploy start --manifest changed-sources/package/package.xml \
+              --post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml \
+              --test-level "$TEST_LEVEL" --wait "$WAIT")
+          else
+            args=(project deploy start --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          fi
           if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
             for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
-          fi
-          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
-            args+=(--post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml)
           fi
           echo "Running: sf ${args[*]}"
           sf "${args[@]}"

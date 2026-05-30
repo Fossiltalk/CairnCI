@@ -257,16 +257,19 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          args=(project deploy validate --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT" --json)
+          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
+            args=(project deploy validate --manifest changed-sources/package/package.xml \
+              --post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml \
+              --test-level "$TEST_LEVEL" --wait "$WAIT" --json)
+          else
+            args=(project deploy validate --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT" --json)
+          fi
           if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
             if [ -z "${TESTS// /}" ]; then
               echo "::error::test-level RunSpecifiedTests requires 'tests'." >&2
               exit 1
             fi
             for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
-          fi
-          if [ -f changed-sources/destructiveChanges/destructiveChanges.xml ]; then
-            args+=(--post-destructive-changes changed-sources/destructiveChanges/destructiveChanges.xml)
           fi
 
           echo "Running: sf ${args[*]}"
