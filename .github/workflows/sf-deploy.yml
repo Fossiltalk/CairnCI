@@ -49,6 +49,11 @@ on:
         required: false
         type: string
         default: ""
+      delta:
+        description: "'true' = deploy only changed metadata (sfdx-git-delta); 'false' = deploy the entire source-dir. Default: true."
+        required: false
+        type: string
+        default: ""
       test-level:
         description: "Apex test level for the full-deploy fallback. Default: RunLocalTests."
         required: false
@@ -107,6 +112,7 @@ jobs:
         env:
           CONFIG_FILE: ${{ inputs.config-file }}
           IN_SOURCE_DIR: ${{ inputs.source-dir }}
+          IN_DELTA: ${{ inputs.delta }}
           IN_TEST_LEVEL: ${{ inputs.test-level }}
           IN_TESTS: ${{ inputs.tests }}
           IN_WAIT: ${{ inputs.wait }}
@@ -122,9 +128,10 @@ jobs:
           } else {
             console.log("No config file at '" + cfgPath + "' — using inputs/defaults.");
           }
-          const defaults = { sourceDir: "force-app", testLevel: "RunLocalTests", tests: "", wait: "60", rollbackStrategy: "none" };
+          const defaults = { sourceDir: "force-app", delta: "true", testLevel: "RunLocalTests", tests: "", wait: "60", rollbackStrategy: "none" };
           const inputs = {
             sourceDir: process.env.IN_SOURCE_DIR,
+            delta: process.env.IN_DELTA,
             testLevel: process.env.IN_TEST_LEVEL,
             tests: process.env.IN_TESTS,
             wait: process.env.IN_WAIT,
@@ -138,6 +145,7 @@ jobs:
           };
           const map = {
             EFFECTIVE_SOURCE_DIR: "sourceDir",
+            EFFECTIVE_DELTA: "delta",
             EFFECTIVE_TEST_LEVEL: "testLevel",
             EFFECTIVE_TESTS: "tests",
             EFFECTIVE_WAIT: "wait",
@@ -166,6 +174,7 @@ jobs:
         env:
           SF_CLI_VERSION: ${{ inputs.sf-cli-version }}
           SGD_VERSION: ${{ inputs.sgd-version }}
+          DELTA: ${{ env.EFFECTIVE_DELTA }}
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.npm-global"
@@ -182,14 +191,25 @@ jobs:
           fi
           sf version
 
-          sgdWanted="$(npm view "sfdx-git-delta@${SGD_VERSION}" version)"
-          sgdInstalled="$(sf plugins 2>/dev/null | sed -n 's/.*sfdx-git-delta \([0-9][0-9.]*\).*/\1/p' | head -n1 || true)"
-          if [ "$sgdInstalled" = "$sgdWanted" ]; then
-            echo "sfdx-git-delta $sgdInstalled already installed — skipping."
+          # sfdx-git-delta is only needed for delta mode.
+          if [ "$DELTA" != "true" ]; then
+            echo "Full-branch mode (delta=false) — skipping sfdx-git-delta install."
           else
-            echo y | sf plugins install "sfdx-git-delta@${sgdWanted}"
+            # Trust the unsigned plugin via the allowlist instead of piping a 'y'
+            # to the prompt. Merge so we don't clobber other allowlisted plugins.
+            allow="$HOME/.config/sf/unsignedPluginAllowList.json"
+            mkdir -p "$(dirname "$allow")"
+            node -e 'const fs=require("fs");const p=process.argv[1];let a=[];try{a=JSON.parse(fs.readFileSync(p,"utf8"));if(!Array.isArray(a))a=[];}catch{}; if(!a.includes("sfdx-git-delta"))a.push("sfdx-git-delta"); fs.writeFileSync(p,JSON.stringify(a));' "$allow"
+
+            sgdWanted="$(npm view "sfdx-git-delta@${SGD_VERSION}" version)"
+            sgdInstalled="$(sf plugins 2>/dev/null | sed -n 's/.*sfdx-git-delta \([0-9][0-9.]*\).*/\1/p' | head -n1 || true)"
+            if [ "$sgdInstalled" = "$sgdWanted" ]; then
+              echo "sfdx-git-delta $sgdInstalled already installed — skipping."
+            else
+              sf plugins install "sfdx-git-delta@${sgdWanted}"
+            fi
+            sf plugins
           fi
-          sf plugins
 
       - name: Authenticate to target org
         shell: bash
@@ -206,14 +226,21 @@ jobs:
           printf '%s' "$SFDX_AUTH_URL" > "$authfile"
           sf org login sfdx-url --sfdx-url-file "$authfile" --alias target-org --set-default
 
-      - name: Generate delta
+      - name: Prepare sources (delta or full branch)
         id: delta
         shell: bash
         env:
           SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
+          DELTA: ${{ env.EFFECTIVE_DELTA }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
+          if [ "$DELTA" != "true" ]; then
+            echo "Full-branch mode: deploying the entire '$SRC_DIR'."
+            echo "deploy-dir=$SRC_DIR" >> "$GITHUB_OUTPUT"
+            echo "has-changes=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # On a branch push, github.event.before is the previous tip. If it is the
           # zero-sha (new branch / force scenarios) fall back to the first parent.
           from="$BEFORE_SHA"
@@ -229,6 +256,7 @@ jobs:
             --generate-delta
           echo "----- delta package.xml -----"
           cat changed-sources/package/package.xml 2>/dev/null || echo "(none)"
+          echo "deploy-dir=changed-sources/$SRC_DIR" >> "$GITHUB_OUTPUT"
           if grep -q "<types>" changed-sources/package/package.xml 2>/dev/null; then
             echo "has-changes=true" >> "$GITHUB_OUTPUT"
           else
@@ -275,7 +303,7 @@ jobs:
         shell: bash
         env:
           JOB_ID: ${{ steps.lookup.outputs.job-id }}
-          SRC_DIR: ${{ env.EFFECTIVE_SOURCE_DIR }}
+          DEPLOY_DIR: ${{ steps.delta.outputs.deploy-dir }}
           TEST_LEVEL: ${{ env.EFFECTIVE_TEST_LEVEL }}
           TESTS: ${{ env.EFFECTIVE_TESTS }}
           WAIT: ${{ env.EFFECTIVE_WAIT }}
@@ -292,7 +320,7 @@ jobs:
             echo "No reusable validation — running a full deploy."
           fi
 
-          args=(project deploy start --source-dir "changed-sources/${SRC_DIR}" --test-level "$TEST_LEVEL" --wait "$WAIT")
+          args=(project deploy start --source-dir "$DEPLOY_DIR" --test-level "$TEST_LEVEL" --wait "$WAIT")
           if [ "$TEST_LEVEL" = "RunSpecifiedTests" ]; then
             for t in ${TESTS//,/ }; do args+=(--tests "$t"); done
           fi

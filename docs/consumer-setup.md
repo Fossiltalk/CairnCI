@@ -186,6 +186,19 @@ deploy job still reports failure so the problem stays visible.
 write*, or grant it in your caller workflow — the reusable workflow can't exceed
 what your repo allows.
 
+### 5b. Delta vs. full-branch deploys (optional)
+
+By default (`delta: true`) only the metadata that changed is validated/deployed,
+using [sfdx-git-delta](https://github.com/scolladon/sfdx-git-delta) — fast, and
+the common case. Set `delta: false` (input or config) to validate/deploy the
+**entire `source-dir`** instead. In full-branch mode the sfdx-git-delta plugin is
+not installed or used at all.
+
+> sfdx-git-delta is an unsigned Salesforce CLI plugin. Rather than auto-answering
+> the install prompt, the pipeline adds it to the CLI's
+> `unsignedPluginAllowList.json` so it installs without prompting. (See the
+> [Salesforce allowlist docs](https://developer.salesforce.com/docs/atlas.en-us.sfdx_setup.meta/sfdx_setup/sfdx_setup_allowlist.htm).)
+
 ---
 
 ## 6. Configuration: inputs and/or a config file
@@ -218,6 +231,7 @@ The field gate follows the same precedence with its own
 | Input            | Default          | Notes |
 |------------------|------------------|-------|
 | `source-dir`     | `force-app`      | Your SFDX source directory. |
+| `delta`          | `true`           | `true` = only changed metadata (sfdx-git-delta); `false` = whole `source-dir`. See §5b. |
 | `test-level`     | `RunLocalTests`  | `NoTestRun` / `RunSpecifiedTests` / `RunLocalTests` / `RunAllTestsInOrg`. |
 | `tests`          | `""`             | Space/comma separated classes when `RunSpecifiedTests`. |
 | `node-version`   | `20`             | sfdx-git-delta requires >= 20. |
