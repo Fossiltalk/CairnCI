@@ -1,12 +1,7 @@
 {
   "packageDirectories": [
-    {
-      "path": "force-app",
-      "default": true
-    }
+    { "path": "tests/fixtures/force-app", "default": true }
   ],
-  "name": "CairnCI",
   "namespace": "",
-  "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "61.0"
 }

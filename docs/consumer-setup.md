@@ -182,6 +182,16 @@ deploy job still reports failure so the problem stays visible.
 write*, or grant it in your caller workflow — the reusable workflow can't exceed
 what your repo allows.
 
+### 5c. Validate against a fresh scratch org (optional)
+
+By default validation runs against the org from the `SFDX_AUTH_URL` secret. Set
+`org-mode: scratch` on the **validate** caller to instead spin up an **ephemeral
+scratch org**, validate against it, and delete it afterward. This needs a
+`DEVHUB_SFDX_AUTH_URL` secret (a Dev Hub auth URL) and a scratch definition file
+(`scratch-def-file`, default `config/project-scratch-def.json`). Handy for
+validating against a clean org or for integration-testing the pipeline itself.
+A fresh scratch org is empty, so pair it with `delta: false`.
+
 ### 5b. Delta vs. full-branch deploys (optional)
 
 By default (`delta: true`) only the metadata that changed is validated/deployed,
@@ -238,6 +248,9 @@ e.g. the field gate's `.cairnci/field-policy.json` (see
 | `wait`           | `60`             | Minutes to wait for the org job. |
 | `environment`    | `""` (deploy only) | GitHub Environment to deploy to. |
 | `rollback-strategy` | `none` (deploy only) | `none` / `revert-pr` / `revert-push`. See §5a. |
+| `org-mode`       | `auth-url` (validate only) | `auth-url` or `scratch` (create/delete an ephemeral scratch org from a Dev Hub). See §5c. |
+| `scratch-def-file` | `config/project-scratch-def.json` (validate only) | Scratch definition file used when `org-mode: scratch`. |
+| `min-coverage`   | `75` (validate only) | Minimum org-wide Apex coverage % required to pass. |
 | `config-file`    | `.cairnci/config.json` | Path to the optional JSON config file. |
 
 ## 8. Runners
