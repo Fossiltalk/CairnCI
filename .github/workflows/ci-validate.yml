@@ -19,21 +19,5 @@ jobs:
       test-level: RunLocalTests
     secrets: inherit
 
-  # Dogfood the optional governance gate (Phase 2 extension).
-  field-gate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "lts/*"
-      - uses: ./.github/actions/field-permset-gate
-        with:
-          source-dir: force-app
-          require-permission-set: "true"
-          forbid-breaking-field-changes: "true"
-          # Tighten over time as the org matures:
-          # require-description: "true"
-          # require-data-sensitivity: "true"
+  # The optional field governance gate now lives in Fossiltalk/CairnCI-Extensions.
+  # See https://github.com/Fossiltalk/CairnCI-Extensions to add it as a PR check.
