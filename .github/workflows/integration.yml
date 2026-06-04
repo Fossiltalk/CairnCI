@@ -28,7 +28,9 @@ jobs:
       source-dir: tests/fixtures/force-app
       scratch-def-file: tests/fixtures/config/project-scratch-def.json
       # A fresh scratch org is empty, so validate the whole fixture (no delta).
-      delta: "false"
+      # Expression form on purpose: actionlint types a quoted "false" as a bool
+      # and won't assign it to this string-typed input; `${{ 'false' }}` is a string.
+      delta: ${{ 'false' }}
       test-level: RunLocalTests
       min-coverage: "75"
     secrets: inherit
