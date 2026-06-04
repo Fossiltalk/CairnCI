@@ -23,15 +23,16 @@ through inputs, secrets, and an optional in-repo config file. Two adoption paths
   **quick deploy**, with an automatic full-deploy fallback.
 - **Built on the modern `sf` CLI + sfdx-git-delta**, with pinnable Node/CLI/plugin versions.
 - **Runs on GitHub-hosted or self-hosted** runners.
-- **Optional field governance gate** — blocks new fields lacking permission-set access or
-  required governance metadata.
+- **Optional extensions** — opt-in add-ons (e.g. a field governance gate that blocks new
+  fields lacking permission-set access or required governance metadata) live in
+  [CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions).
 
 **Start here:** [docs/consumer-setup.md](docs/consumer-setup.md) ·
-[field governance](docs/field-governance.md) · example callers in [`examples/`](examples).
+example callers in [`examples/`](examples) ·
+optional extensions in [CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions).
 
 Workflows: [`sf-validate.yml`](.github/workflows/sf-validate.yml),
-[`sf-deploy.yml`](.github/workflows/sf-deploy.yml). Gate action:
-[`.github/actions/field-permset-gate`](.github/actions/field-permset-gate).
+[`sf-deploy.yml`](.github/workflows/sf-deploy.yml).
 
 ## License
 

@@ -59,15 +59,14 @@ version you pin. **Which features run** is decided by which callers you add;
 1. Copy the example callers into your repo's `.github/workflows/`:
    - [`examples/caller-validate.yml`](../examples/caller-validate.yml) — validate on PR.
    - [`examples/caller-deploy.yml`](../examples/caller-deploy.yml) — deploy on merge.
-   - [`examples/caller-field-gate.yml`](../examples/caller-field-gate.yml) — optional governance gate.
+   - For the optional governance gate and other add-ons, see
+     [CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions).
 2. **Pin the version.** Each caller references a released tag, e.g.
    `uses: Fossiltalk/CairnCI/.github/workflows/sf-validate.yml@v1`. Use a
    major tag (`@v1`) for automatic minor updates, or pin to an exact tag/commit
    SHA for maximum reproducibility (recommended for production/government).
 3. (Optional) Add [`examples/config.json`](../examples/config.json) at
-   `.cairnci/config.json` and/or
-   [`examples/field-policy.json`](../examples/field-policy.json) at
-   `.cairnci/field-policy.json` to control behavior in-repo (§6).
+   `.cairnci/config.json` to control behavior in-repo (§6).
 
 A minimal validate caller:
 
@@ -88,8 +87,8 @@ jobs:
 > examples already do this.
 
 To **enable a feature**, add its caller; to **disable** one, remove that caller
-file. To turn the field gate on/off without removing the file, gate its job with
-an `if:` or a repo variable.
+file. To turn an optional job on/off without removing the file, gate it with an
+`if:` or a repo variable.
 
 ---
 
@@ -102,22 +101,22 @@ reviewed and pinned (no external action references at run time).
    preserving paths:
    - `.github/workflows/sf-validate.yml`
    - `.github/workflows/sf-deploy.yml`
-   - `.github/actions/**` (includes the field gate)
 
    For example, from a checkout of `CairnCI` at tag `v1.2.0`:
 
    ```bash
    # run from the root of YOUR repo; SRC points at a CairnCI checkout @ the tag
    SRC=/path/to/CairnCI
-   mkdir -p .github/workflows .github/actions
+   mkdir -p .github/workflows
    cp "$SRC/.github/workflows/sf-validate.yml" .github/workflows/
    cp "$SRC/.github/workflows/sf-deploy.yml"   .github/workflows/
-   cp -r "$SRC/.github/actions/." .github/actions/
-   echo "vendored from Fossiltalk/CairnCI@v1.2.0" > .github/actions/CAIRNCI_VERSION
+   echo "vendored from Fossiltalk/CairnCI@v1.2.0" > .github/CAIRNCI_VERSION
    ```
 
    Record the version you copied (the `CAIRNCI_VERSION` marker above) so
-   audits and future updates know exactly what's running.
+   audits and future updates know exactly what's running. Optional extensions
+   (e.g. the field gate) can be vendored the same way from
+   [CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions).
 
 2. **Add caller workflows that reference the copies locally** (note `./` instead
    of `Fossiltalk/CairnCI/...@v1`). The repo's own dogfood callers are ready
@@ -137,11 +136,8 @@ reviewed and pinned (no external action references at run time).
        secrets: inherit
    ```
 
-   The field gate is referenced locally too:
-   `uses: ./.github/actions/field-permset-gate`.
-
-3. (Optional) Add `.cairnci/config.json` / `.cairnci/field-policy.json`
-   exactly as in Path A (§6) — the resolution logic is identical.
+3. (Optional) Add `.cairnci/config.json` exactly as in Path A (§6) — the
+   resolution logic is identical.
 
 4. **Updating:** re-copy the workflows/actions from a newer CairnCI tag and
    review the diff in a PR. Because there are no external `@vX` references, your
@@ -223,8 +219,9 @@ evaluated before any step runs, so they **must** stay in the caller workflow
 (they can't come from the file). The config file covers behavioral settings:
 `sourceDir`, `testLevel`, `tests`, `wait`, `rollbackStrategy`.
 
-The field gate follows the same precedence with its own
-`.cairnci/field-policy.json` (see [field governance](field-governance.md)).
+Optional extensions follow the same precedence with their own config files —
+e.g. the field gate's `.cairnci/field-policy.json` (see
+[CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions)).
 
 ## 7. Inputs (all optional)
 
@@ -251,6 +248,7 @@ version and skips reinstalling. Self-hosted runners that are not GitHub-hosted
 should have `git`, `node`, `npm`, `unzip`, and (for quick-deploy reuse) the `gh`
 CLI available; if `gh` is missing the deploy job simply runs a full deploy.
 
-## 9. Optional: field permission-set governance gate
+## 9. Optional extensions
 
-See [`field-governance.md`](field-governance.md).
+Opt-in add-ons such as the field permission-set governance gate live in
+[CairnCI-Extensions](https://github.com/Fossiltalk/CairnCI-Extensions).
